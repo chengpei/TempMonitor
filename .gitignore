@@ -1,0 +1,35 @@
+# 构建输出
+build/
+cmake-build-*/
+Debug/
+Release/
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+
+# IDE
+.idea/
+.vscode/
+*.workspace
+*.project
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# 依赖管理
+.vscode/
+.mxproject
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 用户特定文件
+*.swp
+*.swo
+*~
