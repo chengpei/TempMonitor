@@ -16,6 +16,7 @@
   ******************************************************************************
   */
 #include "ds18b20.h"
+#include "esp01s.h"
 #include "string.h"
 #include <stdio.h>
 /* USER CODE END Header */
@@ -62,9 +63,6 @@ uint8_t uart_rx_byte;
 uint8_t uart_rx_buf[128];
 uint16_t uart_rx_len = 0;
 char tcp_tx_buf[64];
-
-void ESP01S_Init(void);
-static void ESP_Send(const char *cmd);
 /* USER CODE END 0 */
 
 /**
@@ -104,7 +102,11 @@ int main(void)
 
   DS18B20_Init();
   HAL_UART_Receive_IT(&huart1, &uart_rx_byte, 1);
-  ESP01S_Init();
+  ESP01S_Init(&huart1,
+              "WIFI-3",
+              "dsJChangxin.",
+              "192.168.3.21",
+              37775);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -130,10 +132,7 @@ int main(void)
                          sizeof(tcp_tx_buf),
                          "temp|%d\r\n",
                          temperature);
-      HAL_UART_Transmit(&huart1,
-                        (uint8_t *)tcp_tx_buf,
-                        len,
-                        HAL_MAX_DELAY);
+      ESP01S_SendData((uint8_t *)tcp_tx_buf, len);
     }
   }
   /* USER CODE END 3 */
@@ -179,51 +178,13 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
   if (huart->Instance == USART1)
   {
-    uart_rx_buf[uart_rx_len++] = uart_rx_byte;
-
-    if (uart_rx_len >= sizeof(uart_rx_buf))
-      uart_rx_len = 0;
-
+    ESP01S_RxHandler(uart_rx_byte);
     HAL_UART_Receive_IT(&huart1, &uart_rx_byte, 1);
   }
-}
-void ESP01S_Init(void)
-{
-  HAL_Delay(1500);               // 等 ESP 上电稳定
-
-  ESP_Send("AT\r\n");
-  HAL_Delay(300);
-
-  ESP_Send("ATE0\r\n");          // 关闭回显
-  HAL_Delay(300);
-
-  ESP_Send("AT+CWMODE=1\r\n");   // STA 模式
-  HAL_Delay(300);
-
-  ESP_Send("AT+CWJAP=\"WIFI-3\",\"dsJChangxin.\"\r\n");
-  HAL_Delay(6000);               // 连 WiFi
-
-  ESP_Send("AT+CIPSTART=\"TCP\",\"192.168.3.21\",37775\r\n");
-  HAL_Delay(2000);
-  //
-  ESP_Send("AT+CIPMODE=1\r\n");  // 透传
-  HAL_Delay(300);
-
-  ESP_Send("AT+CIPSEND\r\n");    // 进入透传
-  HAL_Delay(300);
-
-  ESP_Send("reg|1\r\n");             // 发送注册命令
-}
-
-static void ESP_Send(const char *cmd)
-{
-  HAL_UART_Transmit(&huart1,
-                    (uint8_t *)cmd,
-                    strlen(cmd),
-                    HAL_MAX_DELAY);
 }
 
 /* USER CODE END 4 */
