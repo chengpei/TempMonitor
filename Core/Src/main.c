@@ -18,10 +18,12 @@
 #include "ds18b20.h"
 #include "esp01s.h"
 #include "string.h"
+#include "oled.h"
 #include <stdio.h>
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "i2c.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -60,8 +62,6 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 uint8_t uart_rx_byte;
-uint8_t uart_rx_buf[128];
-uint16_t uart_rx_len = 0;
 char tcp_tx_buf[64];
 /* USER CODE END 0 */
 
@@ -95,6 +95,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
   DWT->CYCCNT = 0;
@@ -105,14 +106,19 @@ int main(void)
   ESP01S_Init(&huart1,
               "WIFI-3",
               "dsJChangxin.",
-              "192.168.3.21",
+              "192.168.3.141",
               37775);
+  OLED_Init();
+  OLED_Clear();
+  OLED_ShowBitmap16x16(0, 0, wen_bytes);
+  OLED_ShowBitmap16x16(16, 0, du_bytes);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
   int16_t temperature;
+  char oled_buf[16];
   while (1)
   {
     /* USER CODE END WHILE */
@@ -133,6 +139,14 @@ int main(void)
                          "temp|%d\r\n",
                          temperature);
       ESP01S_SendData((uint8_t *)tcp_tx_buf, len);
+
+      int16_t t_int  = temperature / 100;        // 21
+      int16_t t_frac = temperature % 100;        // 12
+      snprintf(oled_buf, sizeof(oled_buf), "%d.%02d", t_int, t_frac);
+      OLED_ShowString(0, 2, oled_buf);
+
+      OLED_ShowBitmap16x16(48, 2, sheshidu_bytes);
+
     }
   }
   /* USER CODE END 3 */

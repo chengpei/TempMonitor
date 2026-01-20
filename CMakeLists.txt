@@ -36,7 +36,9 @@ add_executable(${CMAKE_PROJECT_NAME}
         Core/Inc/ds18b20.h
         Core/Src/ds18b20.c
         Core/Inc/esp01s.h
-        Core/Src/esp01s.c)
+        Core/Src/esp01s.c
+        Core/Inc/oled.h
+        Core/Src/oled.c)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
