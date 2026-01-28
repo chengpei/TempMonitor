@@ -56,7 +56,7 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+void rom_to_hex_str(const uint8_t rom[8], char hexRom[8 * 2 + 1]);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -103,15 +103,17 @@ int main(void)
 
   DS18B20_Init();
   HAL_UART_Receive_IT(&huart1, &uart_rx_byte, 1);
-  ESP01S_Init(&huart1,
-              "WIFI-3",
-              "dsJChangxin.",
-              "192.168.3.141",
-              37775);
+  // ESP01S_Init(&huart1,
+  //             "WIFI-3",
+  //             "dsJChangxin.",
+  //             "192.168.3.141",
+  //             37775);
   OLED_Init();
   OLED_Clear();
-  OLED_ShowBitmap16x16(0, 0, wen_bytes);
-  OLED_ShowBitmap16x16(16, 0, du_bytes);
+  OLED_ShowBitmap16x16(0, 0, zhongwen16x16[0]);
+  OLED_ShowBitmap16x16(16, 0, zhongwen16x16[2]);
+  OLED_ShowBitmap16x16(72, 0, zhongwen16x16[1]);
+  OLED_ShowBitmap16x16(88, 0, zhongwen16x16[2]);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -119,34 +121,45 @@ int main(void)
   HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
   int16_t temperature;
   char oled_buf[16];
+  // 读取多个探头的ROM保存起来，28FF8833B5160350/28FF7CFA611603C4
+  uint8_t roms[MAX_DEVICES][8] = {
+    {0x28, 0xFF, 0x88, 0x33, 0xB5, 0x16, 0x03, 0x50}, {0x28, 0xFF, 0x7C, 0xFA, 0x61, 0x16, 0x03, 0xC4}
+  };
+  uint8_t count = MAX_DEVICES;
+  char hexRom[8 * 2 + 1];
+  // if(DS18B20_SearchROM(roms, &count))
+  // {
+    for (uint8_t i = 0; i < count; i++)
+    {
+      DS18B20_Config12Bit_ByROM(roms[i]);
+      rom_to_hex_str(roms[i], hexRom);
+      OLED_ShowString(0, i*2+4, hexRom);
+    }
+  // }
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    HAL_Delay(750);   // 12-bit 转换时间
+    for (uint8_t i = 0; i < count; i++) {
+      if (DS18B20_ReadTemperatureByROM(roms[i], &temperature))
+      {
+        // HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+        // HAL_Delay(20);
+        // HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+        // 组包发到串口：temp|xx\r\n
+        int len = snprintf(tcp_tx_buf,
+                           sizeof(tcp_tx_buf),
+                           "temp%d|%d\r\n", i+1,
+                           temperature);
+        ESP01S_SendData((uint8_t *)tcp_tx_buf, len);
 
-    if (DS18B20_ReadTemperature(&temperature))
-    {
-      // temperature 单位：℃
-      // 你可以打断点 / 串口输出 / OLED 显示
-      HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-      HAL_Delay(20);
-      HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-      // 组包：temp|xx\r\n
-      int len = snprintf(tcp_tx_buf,
-                         sizeof(tcp_tx_buf),
-                         "temp|%d\r\n",
-                         temperature);
-      ESP01S_SendData((uint8_t *)tcp_tx_buf, len);
-
-      int16_t t_int  = temperature / 100;        // 21
-      int16_t t_frac = temperature % 100;        // 12
-      snprintf(oled_buf, sizeof(oled_buf), "%d.%02d", t_int, t_frac);
-      OLED_ShowString(0, 2, oled_buf);
-
-      OLED_ShowBitmap16x16(48, 2, sheshidu_bytes);
-
+        int16_t t_int  = temperature / 100;        // 整数位
+        int16_t t_frac = temperature % 100;        // 小数位
+        snprintf(oled_buf, sizeof(oled_buf), "%d.%02d", t_int, t_frac);
+        OLED_ShowString(i * 72, 2, oled_buf);
+        OLED_ShowBitmap16x16(i * 72 + 40, 2, zhongwen16x16[3]);
+      }
     }
   }
   /* USER CODE END 3 */
@@ -201,6 +214,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   }
 }
 
+void rom_to_hex_str(const uint8_t rom[8], char hexRom[8 * 2 + 1]) {
+  for(int i = 0; i < 8; i++) {
+    sprintf(&hexRom[i*2], "%02X", rom[i]);
+  }
+  hexRom[16] = '\0'; // 末尾加 '\0'
+}
 /* USER CODE END 4 */
 
 /**
